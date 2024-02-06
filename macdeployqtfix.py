@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 finish the job started by macdeployqtfix
@@ -34,18 +34,16 @@ def run_and_get_output(popen_args):
     """Run process and get all output"""
     process_output = namedtuple('ProcessOutput', ['stdout', 'stderr', 'retcode'])
     try:
-        GlobalConfig.logger.debug('run_and_get_output({0})'.format(repr(popen_args)))
 
+        GlobalConfig.logger.debug('run_and_get_output({})'.format(repr(popen_args)))
         proc = Popen(popen_args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         stdout, stderr = proc.communicate(b'')
-        proc_out = process_output(stdout, stderr, proc.returncode)
-
-        GlobalConfig.logger.debug('\tprocess_output: {0}'.format(proc_out))
+        proc_out = process_output(stdout.decode(), stderr.decode(), proc.returncode)
+        GlobalConfig.logger.debug('\tprocess_output: {}'.format(proc_out))
         return proc_out
     except Exception as exc:
-        GlobalConfig.logger.error('\texception: {0}'.format(exc))
-        return process_output('', exc.message, -1)
-
+        GlobalConfig.logger.error('\texception: {}'.format(str(exc)))
+        return process_output('', str(exc), -1)
 
 def get_dependencies(filename):
     """
@@ -54,7 +52,7 @@ def get_dependencies(filename):
     unmodified, just the raw list so then we could eventually re-use in other
     more specialized functions
     """
-    GlobalConfig.logger.debug('get_dependencies({0})'.format(filename))
+    GlobalConfig.logger.debug('get_dependencies({})'.format(filename))
     popen_args = ['otool', '-L', filename]
     proc_out = run_and_get_output(popen_args)
     deps = []
@@ -105,35 +103,19 @@ def normalize_qtplugin_name(filename):
             - relpath is the correct rpath to a qt lib inside the app bundle
     """
 
-    GlobalConfig.logger.debug('normalize_plugin_name({0})'.format(filename))
-
+    GlobalConfig.logger.debug('normalize_plugin_name({})'.format(filename))
     qtplugin_name_rgx = re.compile(QTPLUGIN_NAME_REGEX)
     rgxret = qtplugin_name_rgx.match(filename)
     if not rgxret:
-        msg = 'couldn\'t normalize a non-qt plugin filename: {0}'.format(filename)
+        msg = 'couldn\'t normalize a non-qt plugin filename: {}'.format(filename)
         GlobalConfig.logger.critical(msg)
         raise Exception(msg)
-
-    # qtplugin normalization settings
-    qtplugintype = rgxret.groups()[0]
-    qtpluginname = rgxret.groups()[1]
-
+    qtplugintype, qtpluginname = rgxret.groups()
     templ = Template(QTPLUGIN_NORMALIZED)
-
-    # from qtlib, forge 2 path :
-    #  - absolute path of qt lib in bundle,
-    abspath = os.path.normpath(templ.safe_substitute(
-        prefix=os.path.dirname(GlobalConfig.exepath) + '/..',
-        plugintype=qtplugintype,
-        pluginname=qtpluginname))
-
-    #  - and rpath containing @executable_path, relative to exepath
-    rpath = templ.safe_substitute(
-        prefix='@executable_path/..',
-        plugintype=qtplugintype,
-        pluginname=qtpluginname)
-
-    GlobalConfig.logger.debug('\treturns({0})'.format((qtpluginname, abspath, rpath)))
+    abspath = os.path.normpath(templ.safe_substitute(prefix=os.path.dirname(GlobalConfig.exepath) + '/..',
+                                                     plugintype=qtplugintype, pluginname=qtpluginname))
+    rpath = templ.safe_substitute(prefix='@executable_path/..', plugintype=qtplugintype, pluginname=qtpluginname)
+    GlobalConfig.logger.debug('\treturns({})'.format((qtpluginname, abspath, rpath)))
     return qtpluginname, abspath, rpath
 
 
@@ -148,12 +130,11 @@ def normalize_qtlib_name(filename):
             - abspath is the absolute path of the qt lib inside the app bundle of exepath
             - relpath is the correct rpath to a qt lib inside the app bundle
     """
-    GlobalConfig.logger.debug('normalize_qtlib_name({0})'.format(filename))
-
+    GlobalConfig.logger.debug('normalize_qtlib_name({})'.format(filename))
     qtlib_name_rgx = re.compile(QTLIB_NAME_REGEX)
     rgxret = qtlib_name_rgx.match(filename)
     if not rgxret:
-        msg = 'couldn\'t normalize a non-qt lib filename: {0}'.format(filename)
+        msg = 'couldn\'t normalize a non-qt lib filename: {}'.format(filename)
         GlobalConfig.logger.critical(msg)
         raise Exception(msg)
 
@@ -165,18 +146,10 @@ def normalize_qtlib_name(filename):
 
     # from qtlib, forge 2 path :
     #  - absolute path of qt lib in bundle,
-    abspath = os.path.normpath(templ.safe_substitute(
-        prefix=os.path.dirname(GlobalConfig.exepath) + '/..',
-        qtlib=qtlib,
-        qtversion=qtversion))
-
-    #  - and rpath containing @executable_path, relative to exepath
-    rpath = templ.safe_substitute(
-        prefix='@executable_path/..',
-        qtlib=qtlib,
-        qtversion=qtversion)
-
-    GlobalConfig.logger.debug('\treturns({0})'.format((qtlib, abspath, rpath)))
+    abspath = os.path.normpath(templ.safe_substitute(prefix=os.path.dirname(GlobalConfig.exepath) + '/..',
+                                                     qtlib=qtlib, qtversion=qtversion))
+    rpath = templ.safe_substitute(prefix='@executable_path/..', qtlib=qtlib, qtversion=qtversion)
+    GlobalConfig.logger.debug('\treturns({})'.format((qtlib, abspath, rpath)))
     return qtlib, abspath, rpath
 
 
@@ -190,12 +163,11 @@ def normalize_brew_name(filename):
             - abspath is the absolute path of the qt lib inside the app bundle of exepath
             - relpath is the correct rpath to a qt lib inside the app bundle
     """
-    GlobalConfig.logger.debug('normalize_brew_name({0})'.format(filename))
-
+    GlobalConfig.logger.debug('normalize_brew_name({})'.format(filename))
     brewlib_name_rgx = re.compile(BREWLIB_REGEX)
     rgxret = brewlib_name_rgx.match(filename)
     if not rgxret:
-        msg = 'couldn\'t normalize a brew lib filename: {0}'.format(filename)
+        msg = 'couldn\'t normalize a brew lib filename: {}'.format(filename)
         GlobalConfig.logger.critical(msg)
         raise Exception(msg)
 
@@ -205,16 +177,9 @@ def normalize_brew_name(filename):
 
     # from brewlib, forge 2 path :
     #  - absolute path of qt lib in bundle,
-    abspath = os.path.normpath(templ.safe_substitute(
-        prefix=os.path.dirname(GlobalConfig.exepath) + '/..',
-        brewlib=brewlib))
-
-    #  - and rpath containing @executable_path, relative to exepath
-    rpath = templ.safe_substitute(
-        prefix='@executable_path/..',
-        brewlib=brewlib)
-
-    GlobalConfig.logger.debug('\treturns({0})'.format((brewlib, abspath, rpath)))
+    abspath = os.path.normpath(templ.safe_substitute(prefix=os.path.dirname(GlobalConfig.exepath) + '/..', brewlib=brewlib))
+    rpath = templ.safe_substitute(prefix='@executable_path/..', brewlib=brewlib)
+    GlobalConfig.logger.debug('\treturns({})'.format((brewlib, abspath, rpath)))
     return brewlib, abspath, rpath
 
 
@@ -236,9 +201,8 @@ def fix_dependency(binary, dep):
     # (ie: relative to exepath using '@executable_path' syntax)
     if dep != dep_rpath:
         # dep rpath is not ok
-        GlobalConfig.logger.info('changing rpath \'{0}\' in binary {1}'.format(dep, binary))
-
         # call install_name_tool -change on binary
+        GlobalConfig.logger.info('changing rpath \'{}\' in binary {}'.format(dep, binary))
         popen_args = ['install_name_tool', '-change', dep, dep_rpath, binary]
         proc_out = run_and_get_output(popen_args)
         if proc_out.retcode != 0:
@@ -256,8 +220,7 @@ def fix_dependency(binary, dep):
     if dep_ok and not os.path.exists(dep_abspath):
 
         # ensure destination directory exists
-        GlobalConfig.logger.info('ensuring directory \'{0}\' exists: {0}'.
-                                 format(os.path.dirname(dep_abspath)))
+        GlobalConfig.logger.info('ensuring directory \'{}\' exists'.format(os.path.dirname(dep_abspath)))
         popen_args = ['mkdir', '-p', os.path.dirname(dep_abspath)]
         proc_out = run_and_get_output(popen_args)
         if proc_out.retcode != 0:
@@ -265,10 +228,8 @@ def fix_dependency(binary, dep):
             dep_ok = False
         else:
             # copy missing dependency into bundle
-            qtnamesrc = os.path.join(GlobalConfig.qtpath, 'lib', '{0}.framework'.
-                                     format(qtname), qtname)
-            GlobalConfig.logger.info('copying missing dependency in bundle: {0}'.
-                                     format(qtname))
+            qtnamesrc = os.path.join(GlobalConfig.qtpath, 'lib', '{}.framework'.format(qtname), qtname)
+            GlobalConfig.logger.info('copying missing dependency in bundle: {}'.format(qtname))
             popen_args = ['cp', qtnamesrc, dep_abspath]
             proc_out = run_and_get_output(popen_args)
             if proc_out.retcode != 0:
@@ -276,14 +237,14 @@ def fix_dependency(binary, dep):
                 dep_ok = False
             else:
                 # ensure permissions are correct if we ever have to change its rpath
-                GlobalConfig.logger.info('ensuring 755 perm to {0}'.format(dep_abspath))
+                GlobalConfig.logger.info('ensuring 755 perm to {}'.format(dep_abspath))
                 popen_args = ['chmod', '755', dep_abspath]
                 proc_out = run_and_get_output(popen_args)
                 if proc_out.retcode != 0:
                     GlobalConfig.logger.info(proc_out.stderr)
                     dep_ok = False
     else:
-        GlobalConfig.logger.debug('{0} is at correct location in bundle'.format(qtname))
+        GlobalConfig.logger.debug('{} is at correct location in bundle'.format(qtname))
 
     if dep_ok:
         return fix_binary(dep_abspath)
@@ -300,12 +261,11 @@ def fix_binary(binary):
         - (create the soft links) needed ?
         - do the same for all qt dependencies of binary (recursive)
     """
-    GlobalConfig.logger.debug('fix_binary({0})'.format(binary))
-
     # loop on 'binary' dependencies
+    GlobalConfig.logger.debug('fix_binary({})'.format(binary))
     for dep in get_dependencies(binary):
         if not fix_dependency(binary, dep):
-            GlobalConfig.logger.error('quitting early: couldn\'t fix dependency {0} of {1}'.format(dep, binary))
+            GlobalConfig.logger.error('quitting early: couldn\'t fix dependency {} of {}'.format(dep, binary))
             return False
     return True
 
@@ -318,12 +278,12 @@ def fix_main_binaries():
     bundlepath = os.path.sep.join(GlobalConfig.exepath.split(os.path.sep)[0:-3])
 
     # fix main binary
-    GlobalConfig.logger.info('fixing executable \'{0}\''.format(GlobalConfig.exepath))
+    GlobalConfig.logger.info('fixing executable \'{}\''.format(GlobalConfig.exepath))
     if fix_binary(GlobalConfig.exepath):
         GlobalConfig.logger.info('fixing plugins')
-        for root, dummy, files in os.walk(bundlepath):
+        for root, _, files in os.walk(bundlepath):
             for name in [f for f in files if os.path.splitext(f)[1] == '.dylib']:
-                GlobalConfig.logger.info('fixing plugin {0}'.format(name))
+                GlobalConfig.logger.info('fixing plugin {}'.format(name))
                 if not fix_binary(os.path.join(root, name)):
                     return False
     return True
@@ -340,18 +300,12 @@ def main():
  - 1 : error
  """
 
-    parser = argparse.ArgumentParser(description=descr,
-                                     formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('exepath',
-                        help='path to the binary depending on Qt')
-    parser.add_argument('qtpath',
-                        help='path of Qt libraries used to build the Qt application')
-    parser.add_argument('-q', '--quiet', action='store_true', default=False,
-                        help='do not create log on standard output')
-    parser.add_argument('-nl', '--no-log-file', action='store_true', default=False,
-                        help='do not create log file \'./macdeployqtfix.log\'')
-    parser.add_argument('-v', '--verbose', action='store_true', default=False,
-                        help='produce more log messages(debug log)')
+    parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('exepath', help='path to the binary depending on Qt')
+    parser.add_argument('qtpath', help='path of Qt libraries used to build the Qt application')
+    parser.add_argument('-q', '--quiet', action='store_true', default=False, help='do not create log on standard output')
+    parser.add_argument('-nl', '--no-log-file', action='store_true', default=False, help='do not create log file \'./macdeployqtfix.log\'')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, help='produce more log messages(debug log)')
     args = parser.parse_args()
 
     # globals
@@ -387,8 +341,8 @@ def main():
     else:
         GlobalConfig.logger.error('macdeployqtfix terminated with error')
         ret = 1
-    sys.exit(ret)
 
+    sys.exit(ret)
 
 if __name__ == "__main__":
     main()
